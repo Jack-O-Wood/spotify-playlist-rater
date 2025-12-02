@@ -344,7 +344,7 @@ def label_from_score(score_pct: float) -> str:
     Map 0–100 playlist score to a fun label.
     You can tweak boundaries + text however you want.
     """
-    if score_pct < 30:
+    if score_pct < 20:
         return "⚗️ Uniquely Niche — deep cuts only"
     elif score_pct < 50:
         return "🌱 Pretty unique — not bad"
@@ -415,7 +415,7 @@ def rate_playlist(
       - full scored playlist DataFrame
     """
     # 1) Load + enrich playlist
-    df_playlist_meta = load_playlist_tracks(playlist_url, sp, cache_buster=cache_buster)
+    df_playlist_meta = load_playlist_tracks(playlist_url, sp)
     df_playlist_enriched = enrich_playlist_for_model(df_playlist_meta, sp)
 
     # 2) Ensure every model feature exists
