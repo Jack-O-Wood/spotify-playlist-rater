@@ -415,7 +415,7 @@ def rate_playlist(
       - full scored playlist DataFrame
     """
     # 1) Load + enrich playlist
-    df_playlist_meta = load_playlist_tracks(playlist_url, sp)
+    df_playlist_meta = load_playlist_tracks(playlist_url, sp, cache_buster=cache_buster)
     df_playlist_enriched = enrich_playlist_for_model(df_playlist_meta, sp)
 
     # 2) Ensure every model feature exists
