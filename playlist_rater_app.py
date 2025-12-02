@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import html
-
+import time
 
 from playlist_backend import (
     sp,                    # authenticated Spotify client
@@ -12,16 +12,25 @@ from playlist_backend import (
 
 st.set_page_config(page_title="Playlist Rater", page_icon="🎧", layout="wide")
 
-# --- Custom CSS for styling ---
+# --- Custom CSS for Spotify-style dark theme ---
 st.markdown("""
 <style>
 
-/* ---------- PAGE BACKGROUND & LAYOUT ---------- */
+/* ---------- GLOBAL / THEME ---------- */
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif !important;
+    color: #e5e7eb;
+}
+
+/* Page background */
 [data-testid="stAppViewContainer"] {
     background: radial-gradient(circle at top, #1f2937 0%, #020617 45%, #020617 100%);
 }
 
+/* Main content width */
 .main .block-container {
     max-width: 900px;
     margin: 0 auto;
@@ -40,10 +49,8 @@ st.markdown("""
     background: rgba(0,0,0,0);
 }
 
-/* ---------- TYPOGRAPHY ---------- */
-
+/* Default typography */
 h1, h2, h3 {
-    font-family: 'Segoe UI', system-ui, sans-serif;
     color: #f9fafb !important;
 }
 
@@ -51,10 +58,90 @@ p, label, span {
     color: #e5e7eb !important;
 }
 
-/* ---------- RATING CARD ---------- */
+/* ---------- HERO TITLE + BLURB (TOP) ---------- */
+
+.title-container {
+    text-align: center;
+    margin-top: 2.5rem;
+    margin-bottom: 1.8rem;
+}
+
+.title-text {
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    margin-bottom: 0.9rem;
+    background: linear-gradient(90deg, #1db954, #22c55e, #a5b4fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.blurb-text {
+    font-size: 1.08rem;
+    max-width: 720px;
+    margin: 0 auto;
+    line-height: 1.6;
+    color: #e5e7eb;
+    opacity: 0.95;
+    font-weight: 300;
+}
+
+/* ---------- SECTION TITLES & RATING TEXT ---------- */
+
+/* e.g. "Playlist Rating" */
+.section-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    text-align: center;
+    margin-top: 3rem;
+    margin-bottom: 0.6rem;
+    letter-spacing: -0.02em;
+    background: linear-gradient(90deg, #1db954, #22c55e, #a5b4fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Big % number */
+.rating-number,
+.big-rating {  /* keep old class name too, just in case */
+    font-size: 4rem;
+    font-weight: 800;
+    text-align: center;
+    margin-top: 0.2rem;
+    color: #facc15;  /* gold */
+}
+
+/* Label line under % (e.g. "Uniquely Niche — deep cuts only") */
+.rating-tagline,
+.rating-label {
+    text-align: center;
+    font-size: 1.2rem;
+    color: #f9fafb;
+    margin-top: 0.3rem;
+}
+
+/* Subtext under label (e.g. "Based on 43 tracks") */
+.rating-subtext {
+    font-size: 0.9rem;
+    text-align: center;
+    color: #9ca3af;
+    margin-top: 0.2rem;
+}
+
+/* e.g. "Top 3 Tracks (Cover Preview)" */
+.subsection-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    text-align: center;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    color: #e5e7eb;
+}
+
+/* ---------- RATING CARD / PANELS ---------- */
 
 .card {
-    background: #0f172a;
+    background: #020617;
     border-radius: 18px;
     padding: 1.8rem 2rem;
     margin: 1.2rem 0;
@@ -62,23 +149,10 @@ p, label, span {
     border: 1px solid rgba(148,163,184,0.35);
 }
 
-.big-rating {
-    text-align: center;
-    font-size: 4rem;
-    font-weight: 800;
-    margin-top: -10px;
-    color: #facc15; /* gold */
-}
-
-.rating-label {
-    text-align: center;
-    font-size: 1.4rem;
-    color: #f9fafb;
-}
-            
 /* ---------- BUTTON ---------- */
+
 .stButton > button {
-    background-color: #0f172a !important;
+    background: #020617 !important;
     color: #f9fafb !important;
     border-radius: 999px;
     border: 1px solid #64748b;
@@ -88,15 +162,16 @@ p, label, span {
 }
 
 .stButton > button:hover {
-    background-color: #1f2937 !important;
-    border-color: #facc15 !important;
+    background: #1f2937 !important;
+    border-color: #1db954 !important;
 }
 
 /* ---------- CUSTOM SONG TABLES ---------- */
+
 .cool-table {
     width: 100%;
     border-collapse: collapse;
-    background: #0f172a;
+    background: #020617;
     color: #f1f5f9;
     border-radius: 12px;
     overflow: hidden;
@@ -104,7 +179,7 @@ p, label, span {
 }
 
 .cool-table thead {
-    background: #111827;
+    background: #020617;
 }
 
 .cool-table th, .cool-table td {
@@ -128,7 +203,7 @@ p, label, span {
 .cool-table tr:hover td {
     background: #1f2937;
 }
-        
+
 /* Hide empty spacer block right under the button */
 [data-testid="stVerticalBlock"] > div:empty {
     padding: 0 !important;
@@ -136,21 +211,81 @@ p, label, span {
     box-shadow: none !important;
     border-radius: 0 !important;
 }
+            
+/* Force-remove the empty container that appears after the button */
+div[data-testid="stVerticalBlock"] div:has(div[data-testid="stVerticalBlock"] > div:empty),
+div[data-testid="stVerticalBlock"] > div:empty {
+    display: none !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* Simplest removal — works on older browsers */
+div[data-testid="stVerticalBlock"] > div:empty {
+    display: none !important;
+}
+
 
 </style>
 """, unsafe_allow_html=True)
 
 
+# --- Custom Styled Header ---
+st.markdown(
+    """
+    <style>
+    /* Spotify-style header font */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
 
-st.title("🎧 Spotify Playlist Rater")
-st.write(
-    "Paste a public Spotify playlist URL below and see how basic it is"
-    "based on the model from my machine learning project."
+    .title-container {
+        text-align: center;
+        margin-top: 2.5rem;
+        margin-bottom: 1.8rem;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .title-text {
+        font-size: 3rem;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        margin-bottom: 0.9rem;
+        background: linear-gradient(90deg, #1db954, #22c55e, #a5b4fc);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .blurb-text {
+        font-size: 1.08rem;
+        max-width: 720px;
+        margin: 0 auto;
+        line-height: 1.6;
+        color: #e5e7eb;
+        opacity: 0.95;
+        font-weight: 300;
+    }
+    </style>
+
+    <div class="title-container">
+        <div class="title-text">Playlist Popularity Analyzer</div>
+        <div class="blurb-text">
+            This tool uses a machine learning model to score how <strong>“hit-like”</strong>
+            the songs in your playlist are. A gradient-boosted model analyzes each track’s
+            audio features and compares them to songs that performed well in our training data.
+            The higher you score, the more mainstream your playlist. Lower, and look how cool
+            and indie you are.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
 )
+
+
+st.caption("Paste a public Spotify playlist URL below to see how your taste stacks up.")
 
 # --- Input ---
 
-default_url = "https://open.spotify.com/playlist/5xbg1Y0wWC0daWLpq0cesL?si=02378546eecf4a02"
+default_url = "https://open.spotify.com/playlist/0vurNqxrcDS4TYOpQvNxNA?si=pdUuGqKhRwiBfCrbv0unLg"
 
 playlist_url = st.text_input(
     "Spotify playlist URL:",
@@ -178,27 +313,39 @@ if rate_button:
                     model=best_xgb_full,
                     model_features=model_features,
                     threshold=best_threshold_full,
+                    cache_buster=time.time(),
                 )
 
                 # --- Big final rating section ---
                 final_pct = summary.get("final_score_pct", 0.0)
                 label = summary.get("label", "")
 
-                st.markdown("<div class='card'>", unsafe_allow_html=True)
+                # Card container
+                # st.markdown("<div class='card'>", unsafe_allow_html=True)
 
-                st.markdown("<h2 style='text-align:center; color:#f9fafb;'>🎯 Playlist Rating</h2>", unsafe_allow_html=True)
-
-
-                st.markdown(f"<div class='big-rating'>{final_pct:.1f}%</div>", unsafe_allow_html=True)
-
-                st.markdown(f"<div class='rating-label'>{label}</div>", unsafe_allow_html=True)
-
+                # Spotify-styled section header + rating
                 st.markdown(
-                    f"<p style='text-align:center; color:#cbd5f5;'>Based on {len(df_scored)} tracks</p>",
+                    "<div class='section-title'>Playlist Rating</div>",
                     unsafe_allow_html=True,
                 )
 
-                st.markdown("</div>", unsafe_allow_html=True)
+                st.markdown(
+                    f"<div class='rating-number'>{final_pct:.1f}%</div>",
+                    unsafe_allow_html=True,
+                )
+
+                st.markdown(
+                    f"<div class='rating-tagline'>{label}</div>",
+                    unsafe_allow_html=True,
+                )
+
+                st.markdown(
+                    f"<div class='rating-subtext'>Based on {len(df_scored)} tracks</div>",
+                    unsafe_allow_html=True,
+                )
+
+                # st.markdown("</div>", unsafe_allow_html=True)
+
 
                 # --- Top 3 covers strip (from top5) ---
                 top3 = top5.head(3)

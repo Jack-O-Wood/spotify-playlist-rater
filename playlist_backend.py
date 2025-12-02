@@ -78,7 +78,7 @@ def extract_playlist_id(playlist_ref: str) -> str:
     return playlist_ref
 
 
-def load_playlist_tracks(playlist_ref: str, sp_client) -> pd.DataFrame:
+def load_playlist_tracks(playlist_ref: str, sp_client, cache_buster=None) -> pd.DataFrame:
     """
     Pull all tracks from a playlist and basic track/artist metadata.
     Returns df with columns: track_id, track_name, artist_name, artist_id, album_release_date, album_image_url.
@@ -357,6 +357,10 @@ def label_from_score(score_pct: float) -> str:
 
 # --- paste summarize_playlist() here ---
 def summarize_playlist(df_playlist_enriched, k=20, soft_threshold=0.70):
+
+    MU_BG = 0.29   
+    SIGMA_BG = 0.1
+
     scores = df_playlist_enriched["hit_score"]
 
     mean_score = scores.mean()
@@ -365,21 +369,26 @@ def summarize_playlist(df_playlist_enriched, k=20, soft_threshold=0.70):
     k_eff = min(k, len(scores))
     top_k_mean = scores.nlargest(k_eff).mean()
 
-    playlist_index = 0.4 * mean_score + 0.6 * top_k_mean
+    playlist_index = 0.2 * mean_score + 0.8 * top_k_mean
 
     df_playlist_enriched["predicted_hit_soft"] = (
         df_playlist_enriched["hit_score"] >= soft_threshold
     ).astype(int)
     hit_rate_soft = df_playlist_enriched["predicted_hit_soft"].mean()
 
+    # z score 
+    z = (playlist_index - MU_BG) / SIGMA_BG
+
+    rating = 40 + 20 * z
+    rating = float(np.clip(rating, 0, 100).round(1))
     final_score_pct = round(playlist_index * 100, 1)
-    label = label_from_score(final_score_pct)
+    label = label_from_score(rating)
 
     summary = {
         "mean_score": mean_score,
         "top_k_mean": top_k_mean,
         "playlist_index": playlist_index,
-        "final_score_pct": final_score_pct,
+        "final_score_pct": rating, # either rating (z score), or final_score_pct (regular index)
         "label": label,
         "soft_threshold": soft_threshold,
         "soft_hit_rate": hit_rate_soft,
@@ -396,6 +405,7 @@ def rate_playlist(
     threshold: float,
     soft_threshold: float = 0.70,
     top_k: int = 5,
+    cache_buster=None,
 ):
     """
     Given a Spotify playlist URL, return:
@@ -439,21 +449,29 @@ def rate_playlist(
     # 6) Top / bottom tables for display
     display_cols = ["track_name", "artist_name", "year", "hit_score", "album_image_url"]
 
+    # Remove duplicates (by track ID if you have it, or track_name + artist)
+    deduped = df_playlist_enriched.drop_duplicates(
+        subset=["track_name", "artist_name"]
+    )
+
+    # Top K
     top = (
-        df_playlist_enriched
+        deduped
         .sort_values("hit_score", ascending=False)
         [display_cols]
         .head(top_k)
         .reset_index(drop=True)
     )
 
+    # Bottom K
     bottom = (
-        df_playlist_enriched
+        deduped
         .sort_values("hit_score", ascending=True)
         [display_cols]
         .head(top_k)
         .reset_index(drop=True)
     )
+
 
     return summary, top, bottom, df_playlist_enriched
 
